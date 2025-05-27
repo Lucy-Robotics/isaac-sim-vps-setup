@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+
+# region copyright
+# Copyright 2023 NVIDIA Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# endregion
+
+import os
+import sys
+
+
+def main():
+    """Configure an existing remote host with Isaac Sim/Lab using environment variables from .env file"""
+    # Import Docker-dependent modules only when running inside Docker
+    import click
+    from src.python.config import c as config
+    from src.python.debug import debug_break, debug_start  # noqa
+    from src.python.env_loader import get_setup_host_params, validate_required_env_vars
+    from src.python.setup_host_deployer import SetupHostDeployer
+    from src.python.utils import colorize_error
+
+    try:
+        # Validate required environment variables
+        validate_required_env_vars()
+
+        # Load all parameters from environment
+        params = get_setup_host_params()
+
+        # Run the setup
+        SetupHostDeployer(params, config).main()
+
+    except ValueError as e:
+        click.echo(colorize_error(f"Configuration Error: {e}"), err=True)
+        click.echo("\nPlease check your .env file or environment variables.", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(colorize_error(f"Setup Error: {e}"), err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    if os.path.exists("/.dockerenv"):
+        # we're in docker, run command
+        main()
+    else:
+        # we're outside, start docker container first
+        # Import shell_command only when needed
+        from src.python.utils import shell_command
+
+        shell_command(f"./run '{' '.join(sys.argv)}'", verbose=True)

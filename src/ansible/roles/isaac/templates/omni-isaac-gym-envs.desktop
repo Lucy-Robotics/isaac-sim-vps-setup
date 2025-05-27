@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Terminal=true
+Exec={{ launch_scripts_dir }}/omni-isaac-gym-envs.sh
+Name=Omni Isaac Gym Envs
+Icon=/home/{{ ansible_user }}/Pictures/isaacsim-icon-shell.png

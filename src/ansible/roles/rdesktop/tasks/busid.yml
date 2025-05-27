@@ -1,0 +1,62 @@
+# region copyright
+# Copyright 2023 NVIDIA Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# endregion
+
+# update BusID in xorg.conf before GDM start
+# executed from /etc/gdm3/PreSession/Default
+
+- name: Create BusID updater
+  copy:
+    content: |
+      #!/bin/bash
+      BUS_ID=$(nvidia-xconfig --query-gpu-info | grep 'PCI BusID' | head -n 1 | cut -c15-)
+      sed -i "s/BusID.*$/BusID \"$BUS_ID\"/" /etc/X11/xorg.conf
+    dest: /opt/update-busid
+    mode: 0755
+
+- name: Check if GDM3 PreSession directory exists
+  stat:
+    path: /etc/gdm3/PreSession
+  register: gdm3_presession_dir
+
+- name: Create GDM3 PreSession directory if it doesn't exist
+  file:
+    path: /etc/gdm3/PreSession
+    state: directory
+    mode: "0755"
+  when: gdm3_presession_dir.stat.exists == false
+
+- name: Check if GDM3 PreSession Default file exists
+  stat:
+    path: /etc/gdm3/PreSession/Default
+  register: gdm3_presession_file
+
+- name: Create GDM3 PreSession Default file if it doesn't exist
+  copy:
+    content: |
+      #!/bin/sh
+      # Placeholder for PreSession scripts
+    dest: /etc/gdm3/PreSession/Default
+    mode: "0755"
+  when: gdm3_presession_file.stat.exists == false
+
+# add /opt/update-busid to /etc/gdm3/PreSession/Default
+- name: Add BusID updater to /etc/gdm3/PreSession/Default
+  lineinfile:
+    path: /etc/gdm3/PreSession/Default
+    line: /opt/update-busid
+    insertafter: EOF
+    state: present
+  when: gdm3_presession_dir.stat.exists or gdm3_presession_file.stat.exists

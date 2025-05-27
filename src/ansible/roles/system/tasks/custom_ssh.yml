@@ -1,0 +1,78 @@
+# change ssh port to custom value
+
+- name: Set SSH port to {{ ssh_port }}
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    line: "Port {{ item }}"
+    state: present
+    mode: 0644
+  with_items:
+    - "22"
+    - "{{ ssh_port }}"
+
+- name: Create ufw profile for the custom ssh port
+  template:
+    src: custom_ssh.ufwprofile
+    dest: /etc/ufw/applications.d/custom_ssh
+    mode: 0644
+  notify: reload ufw
+
+- name: Reload UFW to recognize new application profile
+  systemd:
+    name: ufw
+    state: reloaded
+  ignore_errors: true
+
+- name: Allow incoming connections to the custom ssh port (using profile)
+  ufw:
+    rule: allow
+    name: custom_ssh
+  ignore_errors: true
+  register: ufw_profile_result
+
+- name: Allow incoming connections to the custom ssh port (fallback using port)
+  ufw:
+    rule: allow
+    port: "{{ ssh_port }}"
+    proto: tcp
+  when: ufw_profile_result is failed
+  ignore_errors: true
+
+- name: Allow incoming connections to standard SSH port
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+  ignore_errors: true
+
+- name: Restart sshd (production environments)
+  service:
+    name: sshd
+    state: restarted
+  when:
+    - ngc_api_key_check | default(true) | bool
+  ignore_errors: true
+
+- name: Restart sshd (testing environments)
+  service:
+    name: sshd
+    state: restarted
+  when:
+    - not (ngc_api_key_check | default(true) | bool)
+    - deployment_name | default('') == 'test'
+  ignore_errors: true
+  register: ssh_restart_result
+
+- name: Wait for SSH to be available on new port
+  wait_for:
+    port: "{{ ssh_port }}"
+    host: "{{ ansible_host | default(inventory_hostname) }}"
+    delay: 2
+    timeout: 30
+  when:
+    - ssh_restart_result is changed
+  ignore_errors: true
+
+- name: Make Ansible to use new ssh port
+  set_fact:
+    ansible_port: "{{ ssh_port }}"

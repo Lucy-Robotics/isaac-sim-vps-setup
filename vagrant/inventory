@@ -1,0 +1,21 @@
+[vagrant_vms]
+ansible-test ansible_host=192.168.121.44 ansible_port=22 ansible_user=vagrant ansible_ssh_private_key_file=/home/charles/Sentience/lucy_isaac_automator/.vagrant/machines/ansible-test/libvirt/private_key
+
+# Map vagrant VMs to isaac group for playbook compatibility  
+[isaac:children]
+vagrant_vms
+
+[vagrant_vms:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+ansible_python_interpreter=/usr/bin/python3
+ansible_connection=ssh
+
+# Test variables - customize these for your testing needs
+application_name=isaac-sim
+deployment_name=test
+ssh_port=2222
+prompt_ansi_color=32
+ngc_api_key_check=false
+
+# NVIDIA variables (for GPU testing)
+generic_driver_apt_package=nvidia-driver-470
