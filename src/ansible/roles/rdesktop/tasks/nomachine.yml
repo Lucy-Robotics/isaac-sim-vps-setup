@@ -1,0 +1,101 @@
+# region copyright
+# Copyright 2023 NVIDIA Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# endregion
+
+---
+# @see https://downloads.nomachine.com/download/?id=2 for new versions
+
+- name: Download NoMachine server
+  get_url:
+    url: https://download.nomachine.com/download/8.12/Linux/nomachine_8.12.12_4_amd64.deb
+    dest: /tmp/nomachine.deb
+    mode: 0644
+    timeout: 600 # 10 minutes
+
+- name: Check if NoMachine package exists
+  stat:
+    path: /tmp/nomachine.deb
+  register: nomachine_package
+
+- name: Install NoMachine server
+  apt:
+    deb: /tmp/nomachine.deb
+    state: present
+  when:
+    - not ansible_check_mode or nomachine_package.stat.exists
+
+- name: Create NX config dir
+  file: >
+    path=/home/{{ ansible_user }}/.nx/config
+    state=directory
+    owner={{ ansible_user }}
+    group={{ ansible_user }}
+
+- name: Check if {{ ansible_user }} user has authorized_keys
+  stat:
+    path: /home/{{ ansible_user }}/.ssh/authorized_keys
+  register: user_authorized_keys
+
+- name: Link authorized keys to NX config
+  file: >
+    src=/home/{{ ansible_user }}/.ssh/authorized_keys
+    dest=/home/{{ ansible_user }}/.nx/config/authorized.crt
+    state=link
+    owner={{ ansible_user }}
+    group={{ ansible_user }}
+  when: user_authorized_keys.stat.exists
+  notify: nx_restart
+
+- name: Warning if no SSH keys found for {{ ansible_user }} user
+  debug:
+    msg: "Warning: No SSH keys found for {{ ansible_user }} user. NoMachine SSH key authentication will not work."
+  when: not user_authorized_keys.stat.exists
+
+# add env var DISPLAY to  /usr/lib/systemd/system/nxserver.service
+- name: Check if nxserver.service exists
+  stat:
+    path: /usr/lib/systemd/system/nxserver.service
+  register: nxserver_service
+
+- name: Add DISPLAY env var to nxserver.service
+  lineinfile:
+    path: /usr/lib/systemd/system/nxserver.service
+    line: Environment="DISPLAY=:0"
+    insertafter: "\\[Service\\]"
+    state: present
+  when:
+    - nxserver_service.stat.exists
+
+# restart nxserver.service on GDM init (fix for "no display detected" error)
+- name: Check if GDM3 PreSession Default exists
+  stat:
+    path: /etc/gdm3/PreSession/Default
+  register: gdm3_presession_default
+
+- name: Restart nxserver.service on GDM init
+  lineinfile:
+    path: /etc/gdm3/PreSession/Default
+    line: (/usr/bin/sleep 5 && /usr/bin/systemctl restart nxserver.service) &
+    insertafter: EOF
+    state: present
+  when:
+    - gdm3_presession_default.stat.exists
+    - nxserver_service.stat.exists
+
+- name: Do daemon-reload
+  systemd:
+    daemon_reload: yes
+  when:
+    - nxserver_service.stat.exists

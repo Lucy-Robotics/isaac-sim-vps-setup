@@ -1,0 +1,35 @@
+# Install noVNC
+
+- name: Prerequisites
+  apt:
+    name: snapd
+    state: latest
+
+# Install noVNC via snap package
+- name: Install noVNC
+  snap:
+    name: novnc
+    state: present
+
+- name: Add noVNC systemd config
+  template:
+    src: novnc.service
+    dest: /etc/systemd/system/novnc.service
+    mode: 0444
+    owner: root
+    group: root
+  notify: reload systemd
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Start noVNC
+  systemd:
+    name: novnc
+    daemon_reload: yes
+    enabled: yes
+    state: started
+  when:
+    - not ansible_check_mode
+  ignore_errors: true

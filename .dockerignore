@@ -1,0 +1,27 @@
+# Avoid Python cache files
+**/__pycache__/
+**/*.pyc
+
+# Avoid state files
+state/
+
+# Avoid uploads and results
+uploads/
+results/
+
+# Avoid IDE files
+.vscode/
+.idea/
+
+# Avoid git files
+.git/
+.gitignore
+
+# Avoid Docker files
+Dockerfile
+.dockerignore
+
+# Avoid misc files
+*.log
+*.tmp
+.DS_Store

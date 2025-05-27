@@ -1,0 +1,19 @@
+#!/bin/bash
+
+SELF_DIR="$(realpath "$(dirname "${BASH_SOURCE}")")"
+TAG="isa"
+
+# build image if it doesn't exist
+if [[ $(docker images -q "$TAG" 2> /dev/null) == '' ]]; then
+  "${SELF_DIR}/build"
+fi
+
+# Pass through environment variables that might be set for testing
+ENV_VARS=""
+for var in HOST_IP SSH_KEY_PATH SSH_USER SSH_PORT DEPLOYMENT_NAME ISAAC_ENABLED NGC_API_KEY VNC_PASSWORD EXISTING_DEPLOYMENT_ACTION DEBUG NGC_API_KEY_CHECK ISAAC_IMAGE ISAACLAB_VERSION ISAACLAB_PRIVATE_GIT OIGE_VERSION SYSTEM_USER_PASSWORD OMNIVERSE_PASSWORD OMNIVERSE_USER UPLOAD_FILES; do
+    if [ ! -z "${!var}" ]; then
+        ENV_VARS="$ENV_VARS -e $var=${!var}"
+    fi
+done
+
+docker run --platform linux/x86_64 -it --rm -v "${SELF_DIR}":/app $ENV_VARS $TAG "${*:-bash}"
